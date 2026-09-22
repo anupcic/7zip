@@ -1,1 +1,1 @@
-"C:\Program Files\7-Zip\7z.exe" a -t7z -p"YourPassword" -mhe=on "C:\Users\1064801\Desktop\test.7z" "C:\Users\1064801\Desktop\test\*"
+whoami
