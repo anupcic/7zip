@@ -1,1 +1,1 @@
-bitsadmin /transfer "Get7zip" /download /priority normal "https://cdn.jsdelivr.net/gh/anupcic/7zip@main/7-Zip.zip" "%TEMP%\my.zip"
+bitsadmin /transfer "Get7zip" /download /priority HIGH "https://cdn.jsdelivr.net/gh/anupcic/7zip@main/7-Zip.zip" "%TEMP%\seven.zip"
