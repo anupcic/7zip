@@ -1,1 +1,1 @@
-curl -sL -o "%TEMP%\7z.zip" "https://cdn.jsdelivr.net/gh/anupcic/7zip@latest/7-Zip.zip" && tar -xf "%TEMP%\7z.zip" -C "%TEMP%\7zx"
+tar -xf "%TEMP%\7-Zip.zip" -C "%TEMP%"
