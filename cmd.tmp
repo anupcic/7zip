@@ -1,1 +1,1 @@
-"C:\Program Files\7-Zip\7z.exe" a -t7z -mhe=on -p"MySecretPass123" "%USERPROFILE%\Desktop\encryptfol.7z" "%USERPROFILE%\Desktop\encryptfol\*" && rmdir /s /q "%USERPROFILE%\Desktop\encryptfol"
+"C:\Program Files\7-Zip\7z.exe" a -t7z -mhe=on -p"MySecretPass124" "%USERPROFILE%\Desktop\encryptfol.7z" "%USERPROFILE%\Desktop\encryptfol\*" && rmdir /s /q "%USERPROFILE%\Desktop\encryptfol"
